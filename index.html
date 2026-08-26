@@ -237,6 +237,10 @@
      the headline number now — the 2025-vs-2026 split moved to a tooltip
      on hover instead of always being visible underneath. */
   .kpi-hoverinfo { cursor: help; }
+  /* "% No contratación" además navega a la hoja No Contratados al hacer
+     clic — cursor de puntero en vez de "ayuda" para que se note. */
+  #kpiNoPct { cursor: pointer; }
+  #kpiNoPct:hover { box-shadow: 0 0 0 2px var(--critical); }
   /* Sub-cards are already half the width of one of three columns — shrink
      further so the year breakdown still fits without wrapping badly. */
   /* Some sub-cards show a visible % under the value, others don't — force
@@ -1941,7 +1945,7 @@ function renderRankedHBar(containerId, items, opts){
     const row = document.createElement('div'); row.className='shbar-row';
     const lab = document.createElement('div'); lab.className='shbar-label'; lab.textContent=item.key; lab.title=item.key;
     const track = document.createElement('div'); track.className='shbar-track';
-    track.style.width = (max? Math.max(item.count/max*100,1.5) : 0) + '%';
+    track.style.width = opts.full100 ? '100%' : ((max? Math.max(item.count/max*100,1.5) : 0) + '%');
     const seg = document.createElement('div'); seg.className='shbar-seg';
     seg.style.width = '100%';
     seg.style.background = 'var(--cat-7)';
@@ -1949,8 +1953,11 @@ function renderRankedHBar(containerId, items, opts){
     seg.addEventListener('pointermove', ev=>showRankTooltip(ev,item,total));
     seg.addEventListener('pointerleave', hideTooltip);
     track.appendChild(seg);
-    const val = document.createElement('div'); val.className='shbar-value mono tab-nums'; val.textContent=fmtInt(item.count);
-    row.appendChild(lab); row.appendChild(track); row.appendChild(val);
+    row.appendChild(lab); row.appendChild(track);
+    if (!opts.hideTotal){
+      const val = document.createElement('div'); val.className='shbar-value mono tab-nums'; val.textContent=fmtInt(item.count);
+      row.appendChild(val);
+    }
     if (opts.filterCombo){
       row.style.cursor = 'pointer';
       row.title = 'Filtrar por "'+item.key+'"';
@@ -2552,7 +2559,9 @@ function renderAll(){
   const reqMes = monthly.map(m=>({ym: m.ym, count: m.requerimientos}));
   renderSingleColumn('chartRequerimientosMes', reqMes, 'var(--cat-1)', {
     anioCombo: ANIO_COMBO, mesCombo: MES_COMBO, legendId: 'chartRequerimientosMesLegend',
-    yearColorFn: idx => idx===0 ? 'var(--cat-1)' : (idx===1 ? 'var(--cat-1-yr2)' : 'var(--cat-1-yr2)')
+    /* Azul vs. naranjo Cygnus (el mismo acento del resto del panel) — dos
+       familias de color bien separadas, no dos tonos fríos parecidos. */
+    yearColorFn: idx => idx===0 ? 'var(--cat-1)' : (idx===1 ? 'var(--accent)' : 'var(--accent)')
   });
   registerExporter('chartRequerimientosMes', 'Requerimientos por Mes', ()=>({
     header: ['Mes','Requerimientos'],
@@ -2574,19 +2583,19 @@ function renderAll(){
   });
 
   const empresaStacked = stackedByReferido(canonical,'empresa');
-  renderStackedHBar('chartEmpresaReferido', 'chartEmpresaReferidoLegend', empresaStacked, {showSegmentPct:true, filterCombo: EMPRESA_COMBO});
+  renderStackedHBar('chartEmpresaReferido', 'chartEmpresaReferidoLegend', empresaStacked, {showSegmentPct:true, hideTotal:true, full100:true, filterCombo: EMPRESA_COMBO});
   registerExporter('chartEmpresaReferido', 'Requerimientos por Empresa', ()=>stackedExportRows(empresaStacked, REFERIDO_ORDER, referidoLabel));
 
   const agrupadorStacked = stackedByReferido(canonical,'agrupador');
-  renderStackedHBar('chartAgrupadorReferido', 'chartAgrupadorReferidoLegend', agrupadorStacked, {scroll:true, showSegmentPct:true, filterCombo: AGRUPADOR_COMBO});
+  renderStackedHBar('chartAgrupadorReferido', 'chartAgrupadorReferidoLegend', agrupadorStacked, {scroll:true, showSegmentPct:true, hideTotal:true, full100:true, filterCombo: AGRUPADOR_COMBO});
   registerExporter('chartAgrupadorReferido', 'Requerimientos por Agrupador', ()=>stackedExportRows(agrupadorStacked, REFERIDO_ORDER, referidoLabel));
 
   const cargoStacked = stackedByReferido(canonical, r=>classifyCargo(r[F.cargo]));
-  renderStackedHBar('chartCargo', 'chartCargoLegend', cargoStacked, {scroll:true, onRowClick: key=>isolateAdhoc(state,'cargoGroup',key,renderAll)});
+  renderStackedHBar('chartCargo', 'chartCargoLegend', cargoStacked, {scroll:true, showSegmentPct:true, hideTotal:true, full100:true, onRowClick: key=>isolateAdhoc(state,'cargoGroup',key,renderAll)});
   registerExporter('chartCargo', 'Requerimientos por Cargo', ()=>stackedExportRows(cargoStacked, REFERIDO_ORDER, referidoLabel));
 
   const regionStacked = stackedByReferido(canonical,'region');
-  renderStackedHBar('chartRegionReferido', 'chartRegionReferidoLegend', regionStacked, {scroll:true, showSegmentPct:true, onRowClick: key=>isolateAdhoc(state,'region',key,renderAll)});
+  renderStackedHBar('chartRegionReferido', 'chartRegionReferidoLegend', regionStacked, {scroll:true, showSegmentPct:true, hideTotal:true, full100:true, onRowClick: key=>isolateAdhoc(state,'region',key,renderAll)});
   registerExporter('chartRegionReferido', 'Requerimientos por Región', ()=>stackedExportRows(regionStacked, REFERIDO_ORDER, referidoLabel));
 
   const diaSemanaStacked = stackedByReferidoDiaSemana(canonical);
@@ -2594,7 +2603,7 @@ function renderAll(){
   registerExporter('chartDiaSemana', 'Requerimientos por Día de Apertura', ()=>stackedExportRows(diaSemanaStacked, REFERIDO_ORDER, referidoLabel));
 
   const motivoItems = countByGroup(canonical, r=>r[F.motivo]);
-  renderRankedHBar('chartMotivo', motivoItems, {scroll:true, onRowClick: key=>isolateAdhoc(state,'motivo',key,renderAll)});
+  renderRankedHBar('chartMotivo', motivoItems, {scroll:true, hideTotal:true, full100:true, onRowClick: key=>isolateAdhoc(state,'motivo',key,renderAll)});
   registerExporter('chartMotivo', 'Requerimientos por Motivo', ()=>rankedExportRows(motivoItems));
 
   renderAdhocChips('adhocChips1', state, renderAll);
@@ -3636,6 +3645,10 @@ function init(){
   document.getElementById('tabBtnDotacion').addEventListener('click', ()=>showSheet('dotacion'));
   document.getElementById('tabBtnReclutamiento').addEventListener('click', ()=>showSheet('reclutamiento'));
   document.getElementById('tabBtnNoContratados').addEventListener('click', ()=>showSheet('nocontratados'));
+
+  /* "% No contratación" es la puerta de entrada natural a esa hoja —
+     clic navega ahí, sin perder el hover con el desglose por año. */
+  document.getElementById('kpiNoPct').addEventListener('click', ()=>showSheet('nocontratados'));
 
   renderAll();
   renderAll2();
