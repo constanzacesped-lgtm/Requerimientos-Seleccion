@@ -3546,19 +3546,19 @@ function renderAll3(){
 
   const ncCargoStacked = stackedByReferido(canonicalPerdidos, r=>classifyCargo(r[F.cargo]));
   renderStackedHBar('chartNCCargo', 'chartNCCargoLegend', ncCargoStacked, {
-    scroll:true, onRowClick: key=>isolateAdhoc(state3,'cargoGroup',key,renderAll3)
+    scroll:true, showSegmentPct:true, full100:true, onRowClick: key=>isolateAdhoc(state3,'cargoGroup',key,renderAll3)
   });
   registerExporter('chartNCCargo', 'No Contratados por Cargo', ()=>stackedExportRows(ncCargoStacked, REFERIDO_ORDER, referidoLabel), 3);
 
   const ncRegion = stackedByReferido(canonicalPerdidos,'region');
   renderStackedHBar('chartNCRegion', 'chartNCRegionLegend', ncRegion, {
-    scroll:true, onRowClick: key=>isolateAdhoc(state3,'region',key,renderAll3)
+    scroll:true, showSegmentPct:true, full100:true, onRowClick: key=>isolateAdhoc(state3,'region',key,renderAll3)
   });
   registerExporter('chartNCRegion', 'No Contratados por Región', ()=>stackedExportRows(ncRegion, REFERIDO_ORDER, referidoLabel), 3);
 
   const ncMotivoStacked = stackedByReferido(canonicalPerdidos, r=>fcCausaCierre(r[F.fc_key]));
   renderStackedHBar('chartNCMotivo', 'chartNCMotivoLegend', ncMotivoStacked, {
-    scroll:true, onRowClick: key=>isolateAdhoc(state3,'causaCierre',key,renderAll3)
+    scroll:true, showSegmentPct:true, full100:true, onRowClick: key=>isolateAdhoc(state3,'causaCierre',key,renderAll3)
   });
   registerExporter('chartNCMotivo', 'No Contratados por Motivo', ()=>stackedExportRows(ncMotivoStacked, REFERIDO_ORDER, referidoLabel), 3);
 
