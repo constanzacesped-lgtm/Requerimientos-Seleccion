@@ -770,6 +770,7 @@
       <div class="card-title">Requerimientos por Motivo</div>
     </div>
     <div class="chart-wrap" id="chartMotivo"></div>
+    <div class="legend" id="chartMotivoLegend"></div>
   </div>
 
   <footer class="note">
@@ -1177,7 +1178,7 @@ const state = {
 const ADHOC_DIMS = {
   cargoGroup:  { label:'Cargo', keyFn: r=>classifyCargo(r[F.cargo]) },
   region:      { label:'Región', keyFn: r=>r[F.region] },
-  motivo:      { label:'Motivo', keyFn: r=>r[F.motivo] },
+  motivo:      { label:'Motivo', keyFn: r=>r[F.motivo] || '(Sin dato)' },
   causaCierre: { label:'Causa cierre', keyFn: r=>fcCausaCierre(r[F.fc_key]) },
   diaSemana:   { label:'Día', keyFn: r=>diaSemanaDe(r[F.fecha_creacion]) }
 };
@@ -2602,9 +2603,11 @@ function renderAll(){
   renderStackedHBar('chartDiaSemana', 'chartDiaSemanaLegend', diaSemanaStacked, {showSegmentPct:true, hideTotal:true, full100:true, onRowClick: key=>isolateAdhoc(state,'diaSemana',key,renderAll)});
   registerExporter('chartDiaSemana', 'Requerimientos por Día de Apertura', ()=>stackedExportRows(diaSemanaStacked, REFERIDO_ORDER, referidoLabel));
 
-  const motivoItems = countByGroup(canonical, r=>r[F.motivo]);
-  renderRankedHBar('chartMotivo', motivoItems, {scroll:true, hideTotal:true, full100:true, onRowClick: key=>isolateAdhoc(state,'motivo',key,renderAll)});
-  registerExporter('chartMotivo', 'Requerimientos por Motivo', ()=>rankedExportRows(motivoItems));
+  const motivoStacked = stackedByReferido(canonical, r=>r[F.motivo] || '(Sin dato)');
+  renderStackedHBar('chartMotivo', 'chartMotivoLegend', motivoStacked, {
+    scroll:true, showSegmentPct:true, hideTotal:true, full100:true, onRowClick: key=>isolateAdhoc(state,'motivo',key,renderAll)
+  });
+  registerExporter('chartMotivo', 'Requerimientos por Motivo', ()=>stackedExportRows(motivoStacked, REFERIDO_ORDER, referidoLabel));
 
   renderAdhocChips('adhocChips1', state, renderAll);
 }
