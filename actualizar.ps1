@@ -135,15 +135,20 @@ Write-Host "  -> Copiado."
 Write-Host ""
 
 Write-Host "Paso 4/5: Subiendo a GitHub..."
+$gitExe = "C:\Users\constanza.cesped\AppData\Local\Programs\Git\cmd\git.exe"
+if (-not (Test-Path $gitExe)) {
+  # Por si Git se reinstala en otra ubicación más adelante, intenta el PATH normal como respaldo.
+  $gitExe = "git"
+}
 Set-Location $repoDir
-git add index.html
-git diff --cached --quiet
+& $gitExe add index.html
+& $gitExe diff --cached --quiet
 if ($LASTEXITCODE -eq 0) {
   Write-Host "  -> Sin cambios respecto a la última publicación, no hay nada nuevo que subir."
 } else {
   $fecha = Get-Date -Format "yyyy-MM-dd HH:mm"
-  git commit -m "Actualizacion $fecha" | Out-Null
-  git push origin main
+  & $gitExe commit -m "Actualizacion $fecha" | Out-Null
+  & $gitExe push origin main
   Write-Host "  -> Publicado."
 }
 Write-Host ""
