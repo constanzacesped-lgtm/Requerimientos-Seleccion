@@ -149,7 +149,24 @@ if ($LASTEXITCODE -eq 0) {
   $fecha = Get-Date -Format "yyyy-MM-dd HH:mm"
   & $gitExe commit -m "Actualizacion $fecha" | Out-Null
   & $gitExe push origin main
-  Write-Host "  -> Publicado."
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host ""
+    Write-Host "==================================================" -ForegroundColor Yellow
+    Write-Host " No se pudo subir a GitHub." -ForegroundColor Yellow
+    Write-Host " Lo más probable es que el token de acceso haya vencido." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host " Para arreglarlo:" -ForegroundColor Yellow
+    Write-Host " 1. Ve a https://github.com/settings/tokens/new" -ForegroundColor Yellow
+    Write-Host " 2. Genera un token nuevo (mismos pasos de siempre, marca 'repo')." -ForegroundColor Yellow
+    Write-Host " 3. Pásale el token nuevo a Claude para que lo reconfigure." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host " (El panel de R:\ SÍ se actualizó bien - solo el link" -ForegroundColor Yellow
+    Write-Host " público se quedó con los datos anteriores hasta que" -ForegroundColor Yellow
+    Write-Host " arregles esto.)" -ForegroundColor Yellow
+    Write-Host "==================================================" -ForegroundColor Yellow
+  } else {
+    Write-Host "  -> Publicado."
+  }
 }
 Write-Host ""
 
