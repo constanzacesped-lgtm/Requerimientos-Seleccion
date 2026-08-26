@@ -3528,14 +3528,19 @@ function renderAll3(){
   const canonicalPerdidos = canonical.filter(r=>!r[F.pendiente]);
 
   const ncMonthly = monthlyByReferido(canonicalPerdidos);
-  renderStackedColumnsByMonth('chartNCMes', 'chartNCMesLegend', ncMonthly, {
-    width: 1160, anioCombo: ANIO_COMBO3, mesCombo: MES_COMBO3
+  const ncMesSimple = ncMonthly.map(m=>({ym: m.key, count: m.total}));
+  renderSingleColumn('chartNCMes', ncMesSimple, 'var(--critical)', {
+    width: 1160, anioCombo: ANIO_COMBO3, mesCombo: MES_COMBO3, legendId: 'chartNCMesLegend',
+    yearColorFn: idx => idx===0 ? 'var(--critical)' : (idx===1 ? 'var(--cat-7)' : 'var(--cat-7)')
   });
-  registerExporter('chartNCMes', 'No Contratados por Mes', ()=>stackedExportRows(ncMonthly, REFERIDO_ORDER, referidoLabel), 3);
+  registerExporter('chartNCMes', 'No Contratados por Mes', ()=>({
+    header: ['Mes','No contratados'],
+    rows: ncMonthly.map(m=>[ymLabel(m.key), m.total])
+  }), 3);
 
   const ncEmpresa = stackedByReferido(canonicalPerdidos,'empresa');
   renderStackedHBar('chartNCEmpresa', 'chartNCEmpresaLegend', ncEmpresa, {
-    scroll:true, filterCombo: EMPRESA_COMBO3
+    scroll:true, showSegmentPct:true, full100:true, filterCombo: EMPRESA_COMBO3
   });
   registerExporter('chartNCEmpresa', 'No Contratados por Empresa', ()=>stackedExportRows(ncEmpresa, REFERIDO_ORDER, referidoLabel), 3);
 
