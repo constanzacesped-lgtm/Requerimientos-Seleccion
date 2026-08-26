@@ -182,8 +182,15 @@
   /* The three headline cards (Total requerimientos / Total contratados /
      % Contratación) sit side by side — force them to the same height so
      % Contratación's extra progress bar doesn't make it taller than the
-     other two. */
-  .kpi-col > .kpi { min-height: 134px; display: flex; flex-direction: column; justify-content: center; }
+     other two. Más bajas y compactas que el resto (padding/tipografía
+     propios) porque ocupaban mucho espacio en pantalla. */
+  .kpi-col > .kpi {
+    min-height: 92px; display: flex; flex-direction: column; justify-content: center;
+    padding: 10px 14px 9px;
+  }
+  .kpi-col > .kpi .label { margin-bottom: 5px; }
+  .kpi-col > .kpi .value { font-size: 23px; }
+  .kpi-col > .kpi .meter-track { margin-top: 7px; }
   /* Hoja Reclutamiento y Selección: 6 tarjetas planas en fila — "% Contratación"
      tiene además la barra de progreso, así que sin esto queda más alta que
      las otras 5. */
@@ -693,6 +700,7 @@
       <div class="card-title">Requerimientos por Mes</div>
     </div>
     <div class="chart-wrap" id="chartRequerimientosMes"></div>
+    <div class="legend" id="chartRequerimientosMesLegend"></div>
   </div>
 
   <div class="card">
@@ -1837,7 +1845,7 @@ function renderStackedHBar(containerId, legendId, stacked, opts){
     const row = document.createElement('div'); row.className='shbar-row';
     const lab = document.createElement('div'); lab.className='shbar-label'; lab.textContent=entry.key; lab.title=entry.key;
     const track = document.createElement('div'); track.className='shbar-track';
-    track.style.width = (max? Math.max(entry.total/max*100,1.5) : 0) + '%';
+    track.style.width = opts.full100 ? '100%' : ((max? Math.max(entry.total/max*100,1.5) : 0) + '%');
     order.forEach(refKey=>{
       const c = entry.counts[refKey] || 0;
       if (!c) return;
@@ -1864,8 +1872,11 @@ function renderStackedHBar(containerId, legendId, stacked, opts){
       seg.addEventListener('pointerleave', hideTooltip);
       track.appendChild(seg);
     });
-    const val = document.createElement('div'); val.className='shbar-value mono tab-nums'; val.textContent=fmtInt(entry.total);
-    row.appendChild(lab); row.appendChild(track); row.appendChild(val);
+    row.appendChild(lab); row.appendChild(track);
+    if (!opts.hideTotal){
+      const val = document.createElement('div'); val.className='shbar-value mono tab-nums'; val.textContent=fmtInt(entry.total);
+      row.appendChild(val);
+    }
     if (opts.filterCombo){
       row.style.cursor = 'pointer';
       row.title = 'Filtrar por "'+entry.key+'"';
@@ -2539,7 +2550,10 @@ function renderAll(){
   const monthly = monthlyAgg(rows);
 
   const reqMes = monthly.map(m=>({ym: m.ym, count: m.requerimientos}));
-  renderSingleColumn('chartRequerimientosMes', reqMes, 'var(--cat-1)', {anioCombo: ANIO_COMBO, mesCombo: MES_COMBO});
+  renderSingleColumn('chartRequerimientosMes', reqMes, 'var(--cat-1)', {
+    anioCombo: ANIO_COMBO, mesCombo: MES_COMBO, legendId: 'chartRequerimientosMesLegend',
+    yearColorFn: idx => idx===0 ? 'var(--cat-1)' : (idx===1 ? 'var(--cat-1-yr2)' : 'var(--cat-1-yr2)')
+  });
   registerExporter('chartRequerimientosMes', 'Requerimientos por Mes', ()=>({
     header: ['Mes','Requerimientos'],
     rows: monthly.map(m=>[ymLabel(m.ym), m.requerimientos])
@@ -2576,7 +2590,7 @@ function renderAll(){
   registerExporter('chartRegionReferido', 'Requerimientos por Región', ()=>stackedExportRows(regionStacked, REFERIDO_ORDER, referidoLabel));
 
   const diaSemanaStacked = stackedByReferidoDiaSemana(canonical);
-  renderStackedHBar('chartDiaSemana', 'chartDiaSemanaLegend', diaSemanaStacked, {showSegmentPct:true, onRowClick: key=>isolateAdhoc(state,'diaSemana',key,renderAll)});
+  renderStackedHBar('chartDiaSemana', 'chartDiaSemanaLegend', diaSemanaStacked, {showSegmentPct:true, hideTotal:true, full100:true, onRowClick: key=>isolateAdhoc(state,'diaSemana',key,renderAll)});
   registerExporter('chartDiaSemana', 'Requerimientos por Día de Apertura', ()=>stackedExportRows(diaSemanaStacked, REFERIDO_ORDER, referidoLabel));
 
   const motivoItems = countByGroup(canonical, r=>r[F.motivo]);
@@ -2790,10 +2804,11 @@ function renderSingleColumn(containerId, monthlyArr, color, opts){
       if (!m) return;
       const cx = clusterX0 + yi*(barW+barGap) + barW/2;
       const y = yPos(m.count);
+      const barColor = opts.yearColorFn ? opts.yearColorFn(yi) : color;
       const rect = document.createElementNS(SVGNS,'rect');
       rect.setAttribute('x',cx-barW/2); rect.setAttribute('y',y);
       rect.setAttribute('width',barW); rect.setAttribute('height', Math.max(0,baseline-y));
-      rect.setAttribute('rx',4); rect.setAttribute('fill',color);
+      rect.setAttribute('rx',4); rect.setAttribute('fill',barColor);
       rect.style.cursor = 'pointer';
       rect.addEventListener('pointerenter', ev=>showSingleTooltip(ev,m,fmtValue));
       rect.addEventListener('pointermove', ev=>showSingleTooltip(ev,m,fmtValue));
@@ -2803,7 +2818,9 @@ function renderSingleColumn(containerId, monthlyArr, color, opts){
       }
       svg.appendChild(rect);
       if (m.count>0 && barW>=9) drawVerticalLabel(svg, cx, y, baseline, fmtValue(m.count), '#ffffff');
-      if (nY > 1){
+      /* Con leyenda por año (opts.legendId), el color ya distingue el año
+         — la etiqueta chica '25/'26 debajo de la barra queda redundante. */
+      if (nY > 1 && !opts.legendId){
         const yrLabel = document.createElementNS(SVGNS,'text');
         yrLabel.setAttribute('x',cx); yrLabel.setAttribute('y',baseline+9); yrLabel.setAttribute('text-anchor','middle');
         yrLabel.setAttribute('font-size','8.5'); yrLabel.setAttribute('fill','var(--chart-muted)');
@@ -2824,6 +2841,21 @@ function renderSingleColumn(containerId, monthlyArr, color, opts){
   });
 
   el.appendChild(svg);
+
+  if (opts.legendId){
+    const legendEl = document.getElementById(opts.legendId);
+    if (legendEl){
+      legendEl.innerHTML = '';
+      years.forEach((yr,yi)=>{
+        const item = document.createElement('span'); item.className='legend-item';
+        const key = document.createElement('span'); key.className='legend-key'; key.style.borderRadius='3px';
+        key.style.background = opts.yearColorFn ? opts.yearColorFn(yi) : color;
+        item.appendChild(key);
+        item.appendChild(document.createTextNode(yr));
+        legendEl.appendChild(item);
+      });
+    }
+  }
 }
 function showSingleTooltip(ev,m,formatValue){
   const fmtValue = formatValue || fmtInt;
