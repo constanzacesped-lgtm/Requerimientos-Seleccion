@@ -162,6 +162,10 @@
      don't show through the grid gaps. */
   .sticky-head { position: sticky; top: 0; z-index: 45; background: var(--bg); padding-top: 14px; margin-top: -14px; }
   .kpi-row { position: relative; display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-top: 0; margin-bottom: 20px; align-items: start; }
+  /* Hoja Análisis Requerimientos: las 3 tarjetas principales (Total
+     requerimientos / Total contratados / % Contratación) más angostas y
+     centradas, en vez de estirarse a todo el ancho del panel. */
+  #sheetDotacion .kpi-row { max-width: 780px; margin-left: auto; margin-right: auto; }
   .kpi-row.cols-5 { grid-template-columns: repeat(5,1fr); }
   .kpi-row.cols-4 { grid-template-columns: repeat(4,1fr); }
   .kpi-row.cols-6 { grid-template-columns: repeat(6,1fr); }
@@ -690,10 +694,17 @@
 
   <div class="card">
     <div class="card-head">
-      <div class="card-title">Requerimientos vs Contratados Por Año y Mes</div>
+      <div class="card-title">Requerimientos por Mes</div>
     </div>
-    <div class="chart-wrap" id="chart1"></div>
-    <div class="legend" id="chart1Legend"></div>
+    <div class="chart-wrap" id="chartRequerimientosMes"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title">Contratados y % de Contratación Por Mes</div>
+    </div>
+    <div class="chart-wrap" id="chartContratadosMes"></div>
+    <div class="legend" id="chartContratadosMesLegend"></div>
   </div>
 
   <div class="card">
@@ -2165,11 +2176,14 @@ function renderStackedColumnsByMonth(containerId, legendId, monthlyStacked, opts
   });
 }
 
-/* ---------- Chart 1: grouped columns (requerimientos vs contratados) ---------- */
-function renderChart1(monthly){
-  const el = document.getElementById('chart1');
+/* Antes era un solo gráfico (Requerimientos vs Contratados Por Año y Mes);
+   ahora "Requerimientos por Mes" es su propio gráfico simple (reutiliza
+   renderSingleColumn), y esta función queda solo con Contratados + % de
+   Contratación superpuesto. */
+function renderContratadosChart(monthly){
+  const el = document.getElementById('chartContratadosMes');
   el.innerHTML = '';
-  const legendEl = document.getElementById('chart1Legend');
+  const legendEl = document.getElementById('chartContratadosMesLegend');
   legendEl.innerHTML = '';
   if (!monthly.length){ el.innerHTML = '<div class="chart-empty">Sin datos para el filtro seleccionado</div>'; return; }
 
@@ -2188,15 +2202,6 @@ function renderChart1(monthly){
   const monthNums = [...byMonthNum.keys()].sort((a,b)=>a-b);
   const years = [...new Set(monthly.map(m=>m.ym.split('-')[0]))].sort();
   const nY = years.length;
-  /* Same hue family per metric across years, but a genuinely different
-     (not just lighter/paler) shade per year so both stay fully legible:
-     year 0 uses the base color, year 1 the "-yr2" variant. Years beyond
-     that (rare) fall back to dimming the -yr2 variant further. */
-  const reqColorForYear = (idx)=>{
-    if (idx===0) return 'var(--cat-1)';
-    if (idx===1) return 'var(--cat-1-yr2)';
-    return 'var(--cat-1-yr2)';
-  };
   const conColorForYear = (idx)=>{
     if (idx===0) return 'var(--cat-6)';
     if (idx===1) return 'var(--cat-6-yr2)';
@@ -2216,7 +2221,7 @@ function renderChart1(monthly){
   const W=1160, H=260, padL=44, padR=40, padT=14, padB=30;
   const plotW=W-padL-padR, plotH=H-padT-padB;
   const nSlots = monthNums.length;
-  const maxV = Math.max(1, ...monthly.map(m=>Math.max(m.requerimientos,m.contratados)));
+  const maxV = Math.max(1, ...monthly.map(m=>m.contratados));
   const niceMax = niceCeil(maxV);
   const slotW = plotW/nSlots;
   const yPos = v => padT + plotH - (v/niceMax)*plotH;
@@ -2239,11 +2244,10 @@ function renderChart1(monthly){
   const pctTicks = niceMaxPct===100 ? [0,50,100] : [0, Math.round(niceMaxPct/2), niceMaxPct];
   const yPosPct = v => padT + plotH - (v/niceMaxPct)*plotH;
 
-  const slotPad = slotW*0.07;
-  const clusterGap = slotW*0.10;
-  const clusterW = (slotW - 2*slotPad - clusterGap)/2;
+  const slotPad = slotW*0.12;
+  const clusterW = slotW - 2*slotPad;
   const barGap = 2;
-  const barW = Math.max(3, Math.min(24, (clusterW-(nY-1)*barGap)/nY));
+  const barW = Math.max(4, Math.min(28, (clusterW-(nY-1)*barGap)/nY));
 
   const svg = document.createElementNS(svgNS,'svg');
   svg.setAttribute('viewBox','0 0 '+W+' '+H);
@@ -2277,32 +2281,15 @@ function renderChart1(monthly){
   monthNums.forEach((moNum,i)=>{
     const slotX0 = padL + slotW*i;
     if (i>0) drawMonthSeparator(svg, slotX0, padT, baseline);
-    const reqX0 = slotX0 + slotPad;
-    const conX0 = reqX0 + clusterW + clusterGap;
+    const clusterX0 = slotX0 + slotPad;
     const yearMap = byMonthNum.get(moNum);
 
     years.forEach((yr,yi)=>{
       const entry = yearMap.get(yr) || {requerimientos:0, contratados:0};
-      const reqColor = reqColorForYear(yi);
       const conColor = conColorForYear(yi);
       const op = opacityForYear(yi);
 
-      const rx = reqX0 + yi*(barW+barGap);
-      const ry = yPos(entry.requerimientos);
-      const barReq = document.createElementNS(svgNS,'rect');
-      barReq.setAttribute('x',rx); barReq.setAttribute('y',ry);
-      barReq.setAttribute('width',barW); barReq.setAttribute('height',Math.max(0,baseline-ry));
-      barReq.setAttribute('rx',3); barReq.setAttribute('fill',reqColor);
-      barReq.setAttribute('fill-opacity',op);
-      barReq.style.cursor='pointer';
-      barReq.addEventListener('pointerenter', ev=>showBarTooltip(ev,'Requerimientos',reqColor,moNum,yr,entry.requerimientos));
-      barReq.addEventListener('pointermove', ev=>showBarTooltip(ev,'Requerimientos',reqColor,moNum,yr,entry.requerimientos));
-      barReq.addEventListener('pointerleave', hideTooltip);
-      barReq.addEventListener('click', ()=>isolateYearMonth(ANIO_COMBO, MES_COMBO, yr, moNum));
-      svg.appendChild(barReq);
-      if (entry.requerimientos>0 && barW>=9) drawVerticalLabel(svg, rx+barW/2, ry, baseline, fmtInt(entry.requerimientos), '#ffffff');
-
-      const cx = conX0 + yi*(barW+barGap);
+      const cx = clusterX0 + yi*(barW+barGap);
       const cy = yPos(entry.contratados);
       const barCon = document.createElementNS(svgNS,'rect');
       barCon.setAttribute('x',cx); barCon.setAttribute('y',cy);
@@ -2376,14 +2363,6 @@ function renderChart1(monthly){
 
   el.appendChild(svg);
 
-  years.forEach((yr,yi)=>{
-    const item = document.createElement('span'); item.className='legend-item';
-    const key = document.createElement('span'); key.className='legend-key';
-    key.style.background=reqColorForYear(yi); key.style.opacity=opacityForYear(yi);
-    item.appendChild(key);
-    item.appendChild(document.createTextNode('Requerimientos '+yr));
-    legendEl.appendChild(item);
-  });
   years.forEach((yr,yi)=>{
     const item = document.createElement('span'); item.className='legend-item';
     const key = document.createElement('span'); key.className='legend-key';
@@ -2562,10 +2541,18 @@ function renderAll(){
   const rows = computeFilteredRows();
   renderKPIs(rows);
   const monthly = monthlyAgg(rows);
-  renderChart1(monthly);
-  registerExporter('chart1', 'Requerimientos vs Contratados Por Año y Mes', ()=>({
-    header: ['Mes','Requerimientos','Contratados'],
-    rows: monthly.map(m=>[ymLabel(m.ym), m.requerimientos, m.contratados])
+
+  const reqMes = monthly.map(m=>({ym: m.ym, count: m.requerimientos}));
+  renderSingleColumn('chartRequerimientosMes', reqMes, 'var(--cat-1)', {anioCombo: ANIO_COMBO, mesCombo: MES_COMBO});
+  registerExporter('chartRequerimientosMes', 'Requerimientos por Mes', ()=>({
+    header: ['Mes','Requerimientos'],
+    rows: monthly.map(m=>[ymLabel(m.ym), m.requerimientos])
+  }));
+
+  renderContratadosChart(monthly);
+  registerExporter('chartContratadosMes', 'Contratados y % de Contratación Por Mes', ()=>({
+    header: ['Mes','Contratados','% Contratación'],
+    rows: monthly.map(m=>[ymLabel(m.ym), m.contratados, (m.requerimientos ? (m.contratados/m.requerimientos*100).toFixed(1) : '0.0')+'%'])
   }));
 
   const canonical = canonicalRequerimientos(rows);
