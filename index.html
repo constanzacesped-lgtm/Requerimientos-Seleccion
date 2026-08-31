@@ -367,7 +367,10 @@
   .viz-tooltip {
     position: fixed; pointer-events: none; background: var(--header-bg); color: var(--header-ink);
     border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.28);
-    z-index: 1000; opacity: 0; transform: translate(-50%, -100%); transition: opacity .08s ease; max-width: 260px;
+    /* Por encima de .chart-modal-overlay (z-index 2000) — si no, al pasar
+       el mouse sobre las barras de un gráfico expandido el tooltip se
+       activaba pero quedaba tapado detrás del modal, invisible. */
+    z-index: 2100; opacity: 0; transform: translate(-50%, -100%); transition: opacity .08s ease; max-width: 260px;
   }
   .viz-tooltip.show { opacity: 1; }
   .viz-tooltip .tt-title { font-weight: 700; margin-bottom: 4px; }
