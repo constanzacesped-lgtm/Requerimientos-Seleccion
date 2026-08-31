@@ -9,6 +9,7 @@ $part1     = Join-Path $buildDir "dash_part1.html"
 $part2     = Join-Path $buildDir "dash_part2.html"
 $indexHtml = Join-Path $repoDir "index.html"
 $rCopy     = "R:\Power BI Selección\Selecion Control de Gestion\Requerimientos\Panel de Requerimientos.html"
+$fechaActualizacion = Get-Date -Format "dd-MM-yyyy HH:mm"
 
 Write-Host "=================================================="
 Write-Host " Actualizando Panel de Requerimientos"
@@ -59,7 +60,7 @@ $fields = @("fc_key","empresa","agrupador","referido","fecha_creacion","fecha_fi
 $fieldsJson = '["' + ([string]::Join('","', $fields)) + '"]'
 
 $sw = New-Object System.IO.StreamWriter($outJson, $false, (New-Object System.Text.UTF8Encoding($true)))
-$sw.Write('{"meta":{"fields":' + $fieldsJson + ',"source":"Req Postula Aqui.xlsx (hoja REQ) + Solicitudes Pendiente.xlsx (Sheet1)","total_rows":')
+$sw.Write('{"meta":{"fields":' + $fieldsJson + ',"source":"Req Postula Aqui.xlsx (hoja REQ) + Solicitudes Pendiente.xlsx (Sheet1)","generated_at":"' + $fechaActualizacion + '","total_rows":')
 
 $rowsJson = New-Object System.Collections.Generic.List[string]
 $count = 0
