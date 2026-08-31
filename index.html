@@ -1361,18 +1361,29 @@ function exportChart(id){
 }
 
 let expandedState = null; // { card, placeholder, wasHalf, chartId }
-/* Requerimientos por Día de Apertura: al expandir se pide una vista
-   distinta (números absolutos por Referido/Selección en vez del 100%
-   apilado con %), así que este flag conmuta qué opts usa renderAll() para
-   ese gráfico en particular — el resto de gráficos no tiene este caso. */
-let diaSemanaExpanded = false;
+/* Gráficos de barras 100%-apiladas: al expandir se pide una vista distinta
+   (números absolutos por Referido/Selección, barras a escala real en vez
+   del 100% apilado con %). expandedNumericChart guarda el id del gráfico
+   que está actualmente en esa vista (null si ninguno) — renderAll() lo
+   consulta por gráfico vía stackedBarOpts() para decidir qué opts usar. */
+const NUMERIC_EXPANDABLE = new Set([
+  'chartDiaSemana','chartEmpresaReferido','chartAgrupadorReferido','chartCargo','chartRegionReferido','chartMotivo'
+]);
+let expandedNumericChart = null;
+function stackedBarOpts(chartId, extra){
+  extra = extra || {};
+  if (expandedNumericChart === chartId){
+    return Object.assign({}, extra, {showSegmentPct:false, showSegmentValue:true, hideTotal:false, full100:false});
+  }
+  return Object.assign({}, extra, {showSegmentPct:true, showSegmentValue:false, hideTotal:true, full100:true});
+}
 function closeChartModal(){
   if (!expandedState) return;
   const { card, placeholder, chartId } = expandedState;
   placeholder.parentNode.replaceChild(card, placeholder);
   document.getElementById('chartModalOverlay').classList.remove('show');
   expandedState = null;
-  if (chartId === 'chartDiaSemana'){ diaSemanaExpanded = false; renderAll(); }
+  if (NUMERIC_EXPANDABLE.has(chartId)){ expandedNumericChart = null; renderAll(); }
 }
 function expandChartCard(card, chartId){
   if (expandedState) closeChartModal();
@@ -1384,7 +1395,7 @@ function expandChartCard(card, chartId){
   inner.appendChild(card);
   document.getElementById('chartModalOverlay').classList.add('show');
   expandedState = { card, placeholder, wasHalf, chartId };
-  if (chartId === 'chartDiaSemana'){ diaSemanaExpanded = true; renderAll(); }
+  if (NUMERIC_EXPANDABLE.has(chartId)){ expandedNumericChart = chartId; renderAll(); }
 }
 document.getElementById('chartModalOverlay').addEventListener('click', ev=>{
   if (ev.target.id==='chartModalOverlay') closeChartModal();
@@ -2597,31 +2608,27 @@ function renderAll(){
   });
 
   const empresaStacked = stackedByReferido(canonical,'empresa');
-  renderStackedHBar('chartEmpresaReferido', 'chartEmpresaReferidoLegend', empresaStacked, {showSegmentPct:true, hideTotal:true, full100:true, filterCombo: EMPRESA_COMBO});
+  renderStackedHBar('chartEmpresaReferido', 'chartEmpresaReferidoLegend', empresaStacked, stackedBarOpts('chartEmpresaReferido', {filterCombo: EMPRESA_COMBO}));
   registerExporter('chartEmpresaReferido', 'Requerimientos por Empresa', ()=>stackedExportRows(empresaStacked, REFERIDO_ORDER, referidoLabel));
 
   const agrupadorStacked = stackedByReferido(canonical,'agrupador');
-  renderStackedHBar('chartAgrupadorReferido', 'chartAgrupadorReferidoLegend', agrupadorStacked, {scroll:true, showSegmentPct:true, hideTotal:true, full100:true, filterCombo: AGRUPADOR_COMBO});
+  renderStackedHBar('chartAgrupadorReferido', 'chartAgrupadorReferidoLegend', agrupadorStacked, stackedBarOpts('chartAgrupadorReferido', {scroll:true, filterCombo: AGRUPADOR_COMBO}));
   registerExporter('chartAgrupadorReferido', 'Requerimientos por Agrupador', ()=>stackedExportRows(agrupadorStacked, REFERIDO_ORDER, referidoLabel));
 
   const cargoStacked = stackedByReferido(canonical, r=>classifyCargo(r[F.cargo]));
-  renderStackedHBar('chartCargo', 'chartCargoLegend', cargoStacked, {scroll:true, showSegmentPct:true, hideTotal:true, full100:true, onRowClick: key=>isolateAdhoc(state,'cargoGroup',key,renderAll)});
+  renderStackedHBar('chartCargo', 'chartCargoLegend', cargoStacked, stackedBarOpts('chartCargo', {scroll:true, onRowClick: key=>isolateAdhoc(state,'cargoGroup',key,renderAll)}));
   registerExporter('chartCargo', 'Requerimientos por Cargo', ()=>stackedExportRows(cargoStacked, REFERIDO_ORDER, referidoLabel));
 
   const regionStacked = stackedByReferido(canonical,'region');
-  renderStackedHBar('chartRegionReferido', 'chartRegionReferidoLegend', regionStacked, {scroll:true, showSegmentPct:true, hideTotal:true, full100:true, onRowClick: key=>isolateAdhoc(state,'region',key,renderAll)});
+  renderStackedHBar('chartRegionReferido', 'chartRegionReferidoLegend', regionStacked, stackedBarOpts('chartRegionReferido', {scroll:true, onRowClick: key=>isolateAdhoc(state,'region',key,renderAll)}));
   registerExporter('chartRegionReferido', 'Requerimientos por Región', ()=>stackedExportRows(regionStacked, REFERIDO_ORDER, referidoLabel));
 
   const diaSemanaStacked = stackedByReferidoDiaSemana(canonical);
-  renderStackedHBar('chartDiaSemana', 'chartDiaSemanaLegend', diaSemanaStacked, diaSemanaExpanded
-    ? {showSegmentValue:true, hideTotal:false, full100:false, onRowClick: key=>isolateAdhoc(state,'diaSemana',key,renderAll)}
-    : {showSegmentPct:true, hideTotal:true, full100:true, onRowClick: key=>isolateAdhoc(state,'diaSemana',key,renderAll)});
+  renderStackedHBar('chartDiaSemana', 'chartDiaSemanaLegend', diaSemanaStacked, stackedBarOpts('chartDiaSemana', {onRowClick: key=>isolateAdhoc(state,'diaSemana',key,renderAll)}));
   registerExporter('chartDiaSemana', 'Requerimientos por Día de Apertura', ()=>stackedExportRows(diaSemanaStacked, REFERIDO_ORDER, referidoLabel));
 
   const motivoStacked = stackedByReferido(canonical, r=>r[F.motivo] || '(Sin dato)');
-  renderStackedHBar('chartMotivo', 'chartMotivoLegend', motivoStacked, {
-    scroll:true, showSegmentPct:true, hideTotal:true, full100:true, onRowClick: key=>isolateAdhoc(state,'motivo',key,renderAll)
-  });
+  renderStackedHBar('chartMotivo', 'chartMotivoLegend', motivoStacked, stackedBarOpts('chartMotivo', {scroll:true, onRowClick: key=>isolateAdhoc(state,'motivo',key,renderAll)}));
   registerExporter('chartMotivo', 'Requerimientos por Motivo', ()=>stackedExportRows(motivoStacked, REFERIDO_ORDER, referidoLabel));
 
   renderAdhocChips('adhocChips1', state, renderAll);
