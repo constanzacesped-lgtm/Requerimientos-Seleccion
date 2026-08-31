@@ -1360,15 +1360,21 @@ function exportChart(id){
   downloadCSV(DETAIL_FILENAME[ex.sheet || 1], header, rows);
 }
 
-let expandedState = null; // { card, placeholder, wasHalf }
+let expandedState = null; // { card, placeholder, wasHalf, chartId }
+/* Requerimientos por Día de Apertura: al expandir se pide una vista
+   distinta (números absolutos por Referido/Selección en vez del 100%
+   apilado con %), así que este flag conmuta qué opts usa renderAll() para
+   ese gráfico en particular — el resto de gráficos no tiene este caso. */
+let diaSemanaExpanded = false;
 function closeChartModal(){
   if (!expandedState) return;
-  const { card, placeholder } = expandedState;
+  const { card, placeholder, chartId } = expandedState;
   placeholder.parentNode.replaceChild(card, placeholder);
   document.getElementById('chartModalOverlay').classList.remove('show');
   expandedState = null;
+  if (chartId === 'chartDiaSemana'){ diaSemanaExpanded = false; renderAll(); }
 }
-function expandChartCard(card){
+function expandChartCard(card, chartId){
   if (expandedState) closeChartModal();
   const placeholder = document.createComment('chart-expanded-placeholder');
   card.parentNode.insertBefore(placeholder, card);
@@ -1377,7 +1383,8 @@ function expandChartCard(card){
   inner.classList.toggle('size-half', wasHalf);
   inner.appendChild(card);
   document.getElementById('chartModalOverlay').classList.add('show');
-  expandedState = { card, placeholder, wasHalf };
+  expandedState = { card, placeholder, wasHalf, chartId };
+  if (chartId === 'chartDiaSemana'){ diaSemanaExpanded = true; renderAll(); }
 }
 document.getElementById('chartModalOverlay').addEventListener('click', ev=>{
   if (ev.target.id==='chartModalOverlay') closeChartModal();
@@ -1401,7 +1408,7 @@ function enhanceChartCards(){
     const expandBtn = document.createElement('button');
     expandBtn.type='button'; expandBtn.className='chart-tool-btn'; expandBtn.dataset.role='expand';
     expandBtn.title='Expandir'; expandBtn.textContent='⤢';
-    expandBtn.addEventListener('click', ()=>expandChartCard(card));
+    expandBtn.addEventListener('click', ()=>expandChartCard(card, id));
     const dlBtn = document.createElement('button');
     dlBtn.type='button'; dlBtn.className='chart-tool-btn'; dlBtn.dataset.role='download';
     dlBtn.title='Descargar Excel'; dlBtn.textContent='⬇';
@@ -1857,7 +1864,7 @@ function renderStackedHBar(containerId, legendId, stacked, opts){
       const seg = document.createElement('div'); seg.className='shbar-seg';
       seg.style.width = (c/entry.total*100) + '%';
       seg.style.background = colorFn(refKey);
-      if (opts.showSegmentPct){
+      if (opts.showSegmentPct || opts.showSegmentValue){
         seg.style.display = 'flex';
         seg.style.alignItems = 'center';
         seg.style.justifyContent = 'center';
@@ -1866,10 +1873,16 @@ function renderStackedHBar(containerId, legendId, stacked, opts){
         pctLabel.style.fontWeight = '700';
         pctLabel.style.color = labelColorFn(refKey);
         pctLabel.style.whiteSpace = 'nowrap';
-        /* Un decimal, no redondeo entero — con splits muy desparejos (ej.
-           981 vs 2) redondear a entero mostraba "100%"/"0%" y escondía por
-           completo que existía el otro grupo. */
-        pctLabel.textContent = (c/entry.total*100).toFixed(1) + '%';
+        if (opts.showSegmentValue){
+          /* Vista expandida de Día de Apertura: número absoluto por
+             segmento, no porcentaje. */
+          pctLabel.textContent = fmtInt(c);
+        } else {
+          /* Un decimal, no redondeo entero — con splits muy desparejos (ej.
+             981 vs 2) redondear a entero mostraba "100%"/"0%" y escondía por
+             completo que existía el otro grupo. */
+          pctLabel.textContent = (c/entry.total*100).toFixed(1) + '%';
+        }
         seg.appendChild(pctLabel);
       }
       seg.addEventListener('pointerenter', ev=>showStackTooltip(ev,entry,refKey,c,order,colorFn,groupLabelFn));
@@ -2600,7 +2613,9 @@ function renderAll(){
   registerExporter('chartRegionReferido', 'Requerimientos por Región', ()=>stackedExportRows(regionStacked, REFERIDO_ORDER, referidoLabel));
 
   const diaSemanaStacked = stackedByReferidoDiaSemana(canonical);
-  renderStackedHBar('chartDiaSemana', 'chartDiaSemanaLegend', diaSemanaStacked, {showSegmentPct:true, hideTotal:true, full100:true, onRowClick: key=>isolateAdhoc(state,'diaSemana',key,renderAll)});
+  renderStackedHBar('chartDiaSemana', 'chartDiaSemanaLegend', diaSemanaStacked, diaSemanaExpanded
+    ? {showSegmentValue:true, hideTotal:false, full100:false, onRowClick: key=>isolateAdhoc(state,'diaSemana',key,renderAll)}
+    : {showSegmentPct:true, hideTotal:true, full100:true, onRowClick: key=>isolateAdhoc(state,'diaSemana',key,renderAll)});
   registerExporter('chartDiaSemana', 'Requerimientos por Día de Apertura', ()=>stackedExportRows(diaSemanaStacked, REFERIDO_ORDER, referidoLabel));
 
   const motivoStacked = stackedByReferido(canonical, r=>r[F.motivo] || '(Sin dato)');
